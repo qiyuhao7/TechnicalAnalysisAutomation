@@ -63,6 +63,16 @@ def generate_signals(df, atr_period=14, atr_multiplier=0.5):
     Returns:
         包含交易信号的 DataFrame
     """
+    # 创建副本以避免修改原始 DataFrame
+    df = df.copy()
+    
+    # 检查必需列
+    required_cols = ['resist_pivot_val_real', 'resist_slope_logspace', 'resist_pivot_abs',
+                    'support_pivot_val_real', 'support_slope_logspace', 'support_pivot_abs']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"输入数据缺失必需列: {missing_cols}")
+    
     # 计算 ATR
     atr = calculate_atr(df['high'], df['low'], df['close'], atr_period)
     
@@ -73,65 +83,73 @@ def generate_signals(df, atr_period=14, atr_multiplier=0.5):
     df['long_signal'] = 0
     df['exit_signal'] = 0
     
-    # 生成做多信号
-    for i in range(1, len(df)):
-        # 检查是否有有效的阻力线数据
-        if pd.isna(df['resist_pivot_val_real'].iloc[i]) or pd.isna(df['resist_slope_logspace'].iloc[i]):
-            continue
-            
-        # 计算当前阻力线值
-        resist_pivot_abs = df['resist_pivot_abs'].iloc[i]
-        if resist_pivot_abs < 0:
-            continue
-            
-        # 计算阻力线值（对数空间）
-        resist_line_value_log = np.log(df['resist_pivot_val_real'].iloc[i]) + \
-                               df['resist_slope_logspace'].iloc[i] * (i - resist_pivot_abs)
-        resist_line_value = np.exp(resist_line_value_log)
-        
-        # 检查突破条件
-        current_close = df['close'].iloc[i]
-        threshold = breakout_threshold.iloc[i] if not pd.isna(breakout_threshold.iloc[i]) else 0
-        
-        if current_close > resist_line_value + threshold:
-            df.iloc[i, df.columns.get_loc('long_signal')] = 1
+    # 向量化生成做多信号
+    # 检查有效的阻力线数据
+    valid_resist_mask = (
+        ~pd.isna(df['resist_pivot_val_real']) & 
+        ~pd.isna(df['resist_slope_logspace']) & 
+        (df['resist_pivot_abs'] >= 0)
+    )
     
-    # 生成平仓信号
-    for i in range(1, len(df)):
-        # 检查是否有有效的支撑线数据
-        if pd.isna(df['support_pivot_val_real'].iloc[i]) or pd.isna(df['support_slope_logspace'].iloc[i]):
-            continue
-            
-        # 计算当前支撑线值
-        support_pivot_abs = df['support_pivot_abs'].iloc[i]
-        if support_pivot_abs < 0:
-            continue
-            
-        # 计算支撑线值（对数空间）
-        support_line_value_log = np.log(df['support_pivot_val_real'].iloc[i]) + \
-                                df['support_slope_logspace'].iloc[i] * (i - support_pivot_abs)
-        support_line_value = np.exp(support_line_value_log)
-        
-        # 检查跌破条件
-        current_close = df['close'].iloc[i]
-        threshold = breakout_threshold.iloc[i] if not pd.isna(breakout_threshold.iloc[i]) else 0
-        
-        if current_close < support_line_value - threshold:
-            df.iloc[i, df.columns.get_loc('exit_signal')] = 1
+    # 计算阻力线值（对数空间）
+    resist_pivot_val = df['resist_pivot_val_real'].clip(lower=1e-10)  # 防止日志为零或负数
+    resist_line_value_log = np.log(resist_pivot_val) + \
+                           df['resist_slope_logspace'] * (np.arange(len(df)) - df['resist_pivot_abs'])
+    resist_line_value = np.exp(resist_line_value_log)
+    
+    # 检查突破条件
+    threshold = breakout_threshold.fillna(0)
+    long_signal_condition = (df['close'] > resist_line_value + threshold) & valid_resist_mask
+    df.loc[long_signal_condition, 'long_signal'] = 1
+    
+    # 向量化生成平仓信号
+    # 检查有效的支撑线数据
+    valid_support_mask = (
+        ~pd.isna(df['support_pivot_val_real']) & 
+        ~pd.isna(df['support_slope_logspace']) & 
+        (df['support_pivot_abs'] >= 0)
+    )
+    
+    # 计算支撑线值（对数空间）
+    support_pivot_val = df['support_pivot_val_real'].clip(lower=1e-10)  # 防止日志为零或负数
+    support_line_value_log = np.log(support_pivot_val) + \
+                            df['support_slope_logspace'] * (np.arange(len(df)) - df['support_pivot_abs'])
+    support_line_value = np.exp(support_line_value_log)
+    
+    # 检查跌破条件
+    exit_signal_condition = (df['close'] < support_line_value - threshold) & valid_support_mask
+    df.loc[exit_signal_condition, 'exit_signal'] = 1
     
     return df
 
 
 if __name__ == "__main__":
     try:
+        print("开始测试信号生成函数...")
+        
+        # 测试数据预处理
+        print("1. 测试数据预处理...")
         df = preprocess_data("BTCUSDT3600.csv")
+        print(f"   数据形状: {df.shape}")
+        
+        # 测试信号生成
+        print("2. 测试信号生成...")
         df_with_signals = generate_signals(df)
         
         long_signals = df_with_signals['long_signal'].sum()
         exit_signals = df_with_signals['exit_signal'].sum()
         
-        print(f"信号生成成功")
-        print(f"做多信号数量: {long_signals}")
-        print(f"平仓信号数量: {exit_signals}")
+        print(f"   信号生成成功")
+        print(f"   做多信号数量: {long_signals}")
+        print(f"   平仓信号数量: {exit_signals}")
+        
+        # 验证信号列存在
+        assert 'long_signal' in df_with_signals.columns, "缺少 long_signal 列"
+        assert 'exit_signal' in df_with_signals.columns, "缺少 exit_signal 列"
+        
+        print("所有测试通过！")
+        
     except Exception as e:
-        print(f"信号生成失败: {e}")
+        print(f"测试失败: {e}")
+        import traceback
+        traceback.print_exc()
