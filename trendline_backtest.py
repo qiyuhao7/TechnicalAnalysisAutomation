@@ -496,11 +496,17 @@ def plot_max_drawdown_period(results, cerebro, df):
     
     # 标注期间的买卖点
     for buy_date, buy_price in zip(buy_dates, buy_prices):
-        if start_idx <= np.searchsorted(dates, buy_date) < end_idx:
+        # 将 date 对象转换为 pandas Timestamp 以进行比较
+        buy_timestamp = pd.Timestamp(buy_date)
+        buy_idx = dates.searchsorted(buy_timestamp)
+        if start_idx <= buy_idx < end_idx:
             ax1.scatter(buy_date, buy_price, color='green', marker='^', s=100, zorder=5, alpha=0.7)
     
     for sell_date, sell_price in zip(sell_dates, sell_prices):
-        if start_idx <= np.searchsorted(dates, sell_date) < end_idx:
+        # 将 date 对象转换为 pandas Timestamp 以进行比较
+        sell_timestamp = pd.Timestamp(sell_date)
+        sell_idx = dates.searchsorted(sell_timestamp)
+        if start_idx <= sell_idx < end_idx:
             ax1.scatter(sell_date, sell_price, color='red', marker='v', s=100, zorder=5, alpha=0.7)
     
     ax1.set_ylabel('Price (USDT)')
