@@ -1,8 +1,12 @@
 import pandas as pd
 import numpy as np
 import backtrader as bt
+import matplotlib
 import matplotlib.pyplot as plt
 from trendline_automation import TrendlineOptimizer
+
+# 设置 matplotlib 后端为非交互模式
+matplotlib.use('Agg')
 
 
 def calculate_atr(high, low, close, period=14):
@@ -389,8 +393,8 @@ def plot_equity_curve(results, cerebro):
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     print(f"\n图表已保存到: {plot_file}")
     
-    # 显示图表
-    plt.show()
+    # 关闭图表以释放内存
+    plt.close(fig)
 
 
 def main():
