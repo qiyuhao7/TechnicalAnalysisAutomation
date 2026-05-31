@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import backtrader as bt
 from trendline_automation import TrendlineOptimizer
 
 
@@ -123,6 +124,33 @@ def generate_signals(df, atr_period=14, atr_multiplier=0.5):
     return df
 
 
+class TrendlineBreakoutStrategy(bt.Strategy):
+    """
+    趋势线突破策略
+    
+    做多条件：价格向上突破下降趋势线（阻力线）
+    平仓条件：价格跌破上升趋势线（支撑线）
+    """
+    
+    def __init__(self):
+        # 获取信号数据
+        self.long_signal = self.data.long_signal
+        self.exit_signal = self.data.exit_signal
+        
+    def next(self):
+        # 如果没有持仓且出现做多信号，则买入
+        if self.long_signal[0] == 1 and not self.position:
+            # 计算可买入数量（使用全部资金）
+            cash = self.broker.getcash()
+            price = self.data.close[0]
+            size = cash / price
+            self.buy(size=size)
+            
+        # 如果有持仓且出现平仓信号，则卖出
+        elif self.exit_signal[0] == 1 and self.position:
+            self.sell(size=self.position.size)
+
+
 if __name__ == "__main__":
     try:
         print("开始测试信号生成函数...")
@@ -148,6 +176,16 @@ if __name__ == "__main__":
         assert 'exit_signal' in df_with_signals.columns, "缺少 exit_signal 列"
         
         print("所有测试通过！")
+        
+        # 测试策略类
+        print("\n3. 测试策略类...")
+        try:
+            # 使用 backtrader 的正确方式测试策略类
+            cerebro = bt.Cerebro()
+            cerebro.addstrategy(TrendlineBreakoutStrategy)
+            print("   策略类创建成功")
+        except Exception as e:
+            print(f"   策略类创建失败: {e}")
         
     except Exception as e:
         print(f"测试失败: {e}")
