@@ -140,13 +140,18 @@ class TrendlineBreakoutStrategy(bt.Strategy):
     趋势线突破策略
     
     做多条件：价格向上突破下降趋势线（阻力线）
-    平仓条件：价格跌破上升趋势线（支撑线）或触发 ATR 止损
+    平仓条件：价格跌破上升趋势线（支撑线）或触发 ATR 移动止损
+    
+    ATR 移动止损逻辑：
+    - 以创出的最高价为锚点
+    - 向下回撤 k 倍的 ATR 作为移动止损线
+    - 公式：Trailing Stop = Highest High - (k × ATR)
     """
     
     # 策略参数
     params = (
         ('atr_period', 14),  # ATR 周期
-        ('atr_multiplier', 2.0),  # ATR 乘数，用于计算止损距离
+        ('atr_multiplier', 1.0),  # ATR 乘数，用于计算止损距离
     )
     
     def __init__(self):
@@ -164,9 +169,9 @@ class TrendlineBreakoutStrategy(bt.Strategy):
         self.sell_prices = []
         self.sell_dates = []
         
-        # 止损相关变量
-        self.stop_loss_price = None
-        self.entry_atr = None
+        # 移动止损相关变量
+        self.highest_high = None  # 持仓期间的最高价
+        self.trailing_stop_price = None  # 移动止损价格
         
     def next(self):
         # 如果没有持仓且出现做多信号，则买入
@@ -181,14 +186,22 @@ class TrendlineBreakoutStrategy(bt.Strategy):
             self.buy_prices.append(price)
             self.buy_dates.append(self.data.datetime.date(0))
             
-            # 设置 ATR 止损
-            self.entry_atr = self.atr[0]
-            self.stop_loss_price = price - (self.params.atr_multiplier * self.entry_atr)
+            # 初始化移动止损
+            self.highest_high = self.data.high[0]
+            current_atr = self.atr[0]
+            self.trailing_stop_price = self.highest_high - (self.params.atr_multiplier * current_atr)
             
         # 如果有持仓，检查是否需要卖出
         elif self.position:
-            # 检查是否触发 ATR 止损
-            if self.stop_loss_price is not None and self.data.close[0] < self.stop_loss_price:
+            # 更新最高价
+            if self.data.high[0] > self.highest_high:
+                self.highest_high = self.data.high[0]
+                # 更新移动止损价格
+                current_atr = self.atr[0]
+                self.trailing_stop_price = self.highest_high - (self.params.atr_multiplier * current_atr)
+            
+            # 检查是否触发移动止损
+            if self.trailing_stop_price is not None and self.data.close[0] < self.trailing_stop_price:
                 price = self.data.close[0]
                 self.sell(size=self.position.size)
                 
@@ -197,8 +210,8 @@ class TrendlineBreakoutStrategy(bt.Strategy):
                 self.sell_dates.append(self.data.datetime.date(0))
                 
                 # 重置止损变量
-                self.stop_loss_price = None
-                self.entry_atr = None
+                self.highest_high = None
+                self.trailing_stop_price = None
                 
             # 检查是否出现趋势线平仓信号
             elif self.exit_signal[0] == 1:
@@ -210,8 +223,8 @@ class TrendlineBreakoutStrategy(bt.Strategy):
                 self.sell_dates.append(self.data.datetime.date(0))
                 
                 # 重置止损变量
-                self.stop_loss_price = None
-                self.entry_atr = None
+                self.highest_high = None
+                self.trailing_stop_price = None
 
 
 def run_backtest(df, initial_cash=10000, atr_multiplier=1.0):
