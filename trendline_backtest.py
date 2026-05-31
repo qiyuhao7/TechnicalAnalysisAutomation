@@ -214,7 +214,7 @@ class TrendlineBreakoutStrategy(bt.Strategy):
                 self.entry_atr = None
 
 
-def run_backtest(df, initial_cash=10000, atr_multiplier=2.0):
+def run_backtest(df, initial_cash=10000, atr_multiplier=1.0):
     """
     执行回测
     
