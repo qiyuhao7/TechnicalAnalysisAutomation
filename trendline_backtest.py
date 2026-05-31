@@ -227,6 +227,10 @@ def print_results(results, cerebro):
         results: 回测结果
         cerebro: cerebro 引擎
     """
+    # 检查结果是否为空
+    if not results:
+        raise ValueError("回测结果为空")
+    
     strategy = results[0]
     
     # 获取分析结果
