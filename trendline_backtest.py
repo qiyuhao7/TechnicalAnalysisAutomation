@@ -8,6 +8,10 @@ from trendline_automation import TrendlineOptimizer
 # 设置 matplotlib 后端为非交互模式
 matplotlib.use('Agg')
 
+# 配置中文字体
+plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans', 'Arial Unicode MS', 'sans-serif']
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+
 
 def calculate_atr(high, low, close, period=14):
     """
