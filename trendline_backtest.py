@@ -322,6 +322,114 @@ def print_results(results, cerebro):
     print("="*50)
 
 
+def analyze_trades(results, cerebro):
+    """
+    分析交易情况，找出回撤原因
+    
+    Args:
+        results: 回测结果
+        cerebro: cerebro 引擎
+    """
+    strategy = results[0]
+    
+    # 获取交易记录
+    buy_prices = strategy.buy_prices
+    sell_prices = strategy.sell_prices
+    buy_dates = strategy.buy_dates
+    sell_dates = strategy.sell_dates
+    
+    print("\n" + "="*50)
+    print("交易分析")
+    print("="*50)
+    
+    # 计算每笔交易的盈亏
+    trade_results = []
+    for i in range(min(len(buy_prices), len(sell_prices))):
+        buy_price = buy_prices[i]
+        sell_price = sell_prices[i]
+        pnl = (sell_price - buy_price) / buy_price * 100
+        trade_results.append({
+            'buy_date': buy_dates[i],
+            'sell_date': sell_dates[i],
+            'buy_price': buy_price,
+            'sell_price': sell_price,
+            'pnl_percent': pnl
+        })
+    
+    # 按盈亏排序
+    trade_results.sort(key=lambda x: x['pnl_percent'])
+    
+    print(f"\n总交易次数: {len(trade_results)}")
+    
+    # 显示亏损最大的10笔交易
+    print("\n亏损最大的10笔交易:")
+    print("-" * 80)
+    print(f"{'买入日期':<12} {'卖出日期':<12} {'买入价':<12} {'卖出价':<12} {'盈亏%':<10}")
+    print("-" * 80)
+    
+    for trade in trade_results[:10]:
+        print(f"{trade['buy_date']:<12} {trade['sell_date']:<12} "
+              f"{trade['buy_price']:<12.2f} {trade['sell_price']:<12.2f} "
+              f"{trade['pnl_percent']:<10.2f}%")
+    
+    # 显示盈利最大的10笔交易
+    print("\n盈利最大的10笔交易:")
+    print("-" * 80)
+    print(f"{'买入日期':<12} {'卖出日期':<12} {'买入价':<12} {'卖出价':<12} {'盈亏%':<10}")
+    print("-" * 80)
+    
+    for trade in trade_results[-10:]:
+        print(f"{trade['buy_date']:<12} {trade['sell_date']:<12} "
+              f"{trade['buy_price']:<12.2f} {trade['sell_price']:<12.2f} "
+              f"{trade['pnl_percent']:<10.2f}%")
+    
+    # 分析连续亏损
+    print("\n连续亏损分析:")
+    consecutive_losses = 0
+    max_consecutive_losses = 0
+    current_loss_streak = 0
+    
+    for trade in trade_results:
+        if trade['pnl_percent'] < 0:
+            current_loss_streak += 1
+            max_consecutive_losses = max(max_consecutive_losses, current_loss_streak)
+        else:
+            current_loss_streak = 0
+    
+    print(f"最大连续亏损次数: {max_consecutive_losses}")
+    
+    # 计算亏损交易的平均持有时间
+    loss_durations = []
+    for trade in trade_results:
+        if trade['pnl_percent'] < 0:
+            duration = (trade['sell_date'] - trade['buy_date']).days
+            loss_durations.append(duration)
+    
+    if loss_durations:
+        avg_loss_duration = sum(loss_durations) / len(loss_durations)
+        print(f"亏损交易平均持有天数: {avg_loss_duration:.1f}")
+    
+    # 分析亏损交易的价格模式
+    print("\n亏损交易特征分析:")
+    loss_trades = [t for t in trade_results if t['pnl_percent'] < 0]
+    
+    if loss_trades:
+        avg_loss = sum(t['pnl_percent'] for t in loss_trades) / len(loss_trades)
+        max_loss = min(t['pnl_percent'] for t in loss_trades)
+        print(f"平均亏损幅度: {avg_loss:.2f}%")
+        print(f"最大单笔亏损: {max_loss:.2f}%")
+        
+        # 分析亏损交易的买入价格相对位置
+        high_prices = []
+        for trade in loss_trades:
+            # 这里需要获取交易期间的最高价，但简化处理
+            high_prices.append(trade['buy_price'])
+        
+        print(f"亏损交易平均买入价格: {sum(high_prices)/len(high_prices):.2f}")
+    
+    print("="*50)
+
+
 def main():
     """
     主函数
@@ -354,6 +462,10 @@ def main():
         # 4. 输出结果
         print("4. 输出结果...")
         print_results(results, cerebro)
+        
+        # 5. 交易分析
+        print("5. 交易分析...")
+        analyze_trades(results, cerebro)
         
         print("回测完成！")
         
