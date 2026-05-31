@@ -219,6 +219,62 @@ def run_backtest(df, initial_cash=10000):
     return results, cerebro
 
 
+def print_results(results, cerebro):
+    """
+    打印回测结果
+    
+    Args:
+        results: 回测结果
+        cerebro: cerebro 引擎
+    """
+    strategy = results[0]
+    
+    # 获取分析结果
+    returns_analysis = strategy.analyzers.returns.get_analysis()
+    drawdown_analysis = strategy.analyzers.drawdown.get_analysis()
+    sharpe_analysis = strategy.analyzers.sharpe.get_analysis()
+    trades_analysis = strategy.analyzers.trades.get_analysis()
+    
+    # 打印结果
+    print("\n" + "="*50)
+    print("回测结果")
+    print("="*50)
+    
+    # 基本信息
+    print(f"初始资金: {cerebro.broker.startingcash:,.2f}")
+    print(f"最终资金: {cerebro.broker.getvalue():,.2f}")
+    
+    # 收益率
+    total_return = returns_analysis.get('rtot', 0)
+    print(f"总收益率: {total_return*100:.2f}%")
+    
+    # 最大回撤
+    max_drawdown = drawdown_analysis.get('max', {}).get('drawdown', 0)
+    print(f"最大回撤: {max_drawdown:.2f}%")
+    
+    # 夏普比率
+    sharpe_ratio = sharpe_analysis.get('sharperatio', 0)
+    if sharpe_ratio is not None:
+        print(f"夏普比率: {sharpe_ratio:.4f}")
+    else:
+        print("夏普比率: N/A")
+    
+    # 交易统计
+    total_trades = trades_analysis.get('total', {}).get('total', 0)
+    won_trades = trades_analysis.get('won', {}).get('total', 0)
+    lost_trades = trades_analysis.get('lost', {}).get('total', 0)
+    
+    print(f"总交易次数: {total_trades}")
+    print(f"盈利交易次数: {won_trades}")
+    print(f"亏损交易次数: {lost_trades}")
+    
+    if total_trades > 0:
+        win_rate = won_trades / total_trades * 100
+        print(f"胜率: {win_rate:.2f}%")
+    
+    print("="*50)
+
+
 if __name__ == "__main__":
     try:
         print("开始测试信号生成函数...")
@@ -253,6 +309,16 @@ if __name__ == "__main__":
             print(f"   最终资金: {cerebro.broker.getvalue():,.2f}")
         except Exception as e:
             print(f"   回测执行失败: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # 测试结果输出函数
+        print("\n4. 测试结果输出函数...")
+        try:
+            print_results(results, cerebro)
+            print("结果输出成功")
+        except Exception as e:
+            print(f"结果输出失败: {e}")
             import traceback
             traceback.print_exc()
         
