@@ -173,6 +173,12 @@ def run_backtest(df, initial_cash=10000):
     Returns:
         回测结果
     """
+    # 检查必需列
+    required_cols = ['open', 'high', 'low', 'close', 'long_signal', 'exit_signal']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"输入数据缺失必需列: {missing_cols}")
+    
     # 创建 cerebro 引擎
     cerebro = bt.Cerebro()
     
@@ -184,7 +190,7 @@ def run_backtest(df, initial_cash=10000):
     df_bt = df[['open', 'high', 'low', 'close', 'long_signal', 'exit_signal']].copy()
     
     # 创建数据源
-    data = bt.feeds.PandasData(
+    data = SignalData(
         dataname=df_bt,
         datetime=None,
         open='open',
