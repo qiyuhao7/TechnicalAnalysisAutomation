@@ -194,6 +194,10 @@ if __name__ == "__main__":
             # 准备数据
             df_bt = df_with_signals[['open', 'high', 'low', 'close', 'long_signal', 'exit_signal']].copy()
             
+            # 验证信号列存在
+            assert 'long_signal' in df_bt.columns, "缺少 long_signal 列"
+            assert 'exit_signal' in df_bt.columns, "缺少 exit_signal 列"
+            
             # 创建自定义数据源
             data = SignalData(
                 dataname=df_bt,
@@ -210,7 +214,13 @@ if __name__ == "__main__":
             cerebro = bt.Cerebro()
             cerebro.adddata(data)
             cerebro.addstrategy(TrendlineBreakoutStrategy)
+            
+            # 运行回测
+            results = cerebro.run()
+            strategy = results[0]
+            
             print("   策略类和数据源集成创建成功")
+            print(f"   策略执行完成，最终资金: {cerebro.broker.getvalue():,.2f}")
         except Exception as e:
             print(f"   策略类或数据源集成创建失败: {e}")
             import traceback
