@@ -162,6 +162,57 @@ class TrendlineBreakoutStrategy(bt.Strategy):
             self.sell(size=self.position.size)
 
 
+def run_backtest(df, initial_cash=10000):
+    """
+    执行回测
+    
+    Args:
+        df: 包含交易信号的 DataFrame
+        initial_cash: 初始资金
+        
+    Returns:
+        回测结果
+    """
+    # 创建 cerebro 引擎
+    cerebro = bt.Cerebro()
+    
+    # 添加策略
+    cerebro.addstrategy(TrendlineBreakoutStrategy)
+    
+    # 准备数据
+    # 添加额外列供 backtrader 使用
+    df_bt = df[['open', 'high', 'low', 'close', 'long_signal', 'exit_signal']].copy()
+    
+    # 创建数据源
+    data = bt.feeds.PandasData(
+        dataname=df_bt,
+        datetime=None,
+        open='open',
+        high='high',
+        low='low',
+        close='close',
+        volume=None,
+        openinterest=-1
+    )
+    
+    # 添加数据
+    cerebro.adddata(data)
+    
+    # 设置初始资金
+    cerebro.broker.setcash(initial_cash)
+    
+    # 添加分析器
+    cerebro.addanalyzer(bt.analyzers.Returns, _name='returns')
+    cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
+    cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trades')
+    
+    # 运行回测
+    results = cerebro.run()
+    
+    return results, cerebro
+
+
 if __name__ == "__main__":
     try:
         print("开始测试信号生成函数...")
@@ -188,41 +239,14 @@ if __name__ == "__main__":
         
         print("所有测试通过！")
         
-        # 测试策略类和数据源集成
-        print("\n3. 测试策略类和数据源集成...")
+        # 测试回测执行函数
+        print("\n3. 测试回测执行函数...")
         try:
-            # 准备数据
-            df_bt = df_with_signals[['open', 'high', 'low', 'close', 'long_signal', 'exit_signal']].copy()
-            
-            # 验证信号列存在
-            assert 'long_signal' in df_bt.columns, "缺少 long_signal 列"
-            assert 'exit_signal' in df_bt.columns, "缺少 exit_signal 列"
-            
-            # 创建自定义数据源
-            data = SignalData(
-                dataname=df_bt,
-                datetime=None,
-                open='open',
-                high='high',
-                low='low',
-                close='close',
-                volume=None,
-                openinterest=-1
-            )
-            
-            # 使用 backtrader 的正确方式测试策略类
-            cerebro = bt.Cerebro()
-            cerebro.adddata(data)
-            cerebro.addstrategy(TrendlineBreakoutStrategy)
-            
-            # 运行回测
-            results = cerebro.run()
-            strategy = results[0]
-            
-            print("   策略类和数据源集成创建成功")
-            print(f"   策略执行完成，最终资金: {cerebro.broker.getvalue():,.2f}")
+            results, cerebro = run_backtest(df_with_signals)
+            print("   回测执行成功")
+            print(f"   最终资金: {cerebro.broker.getvalue():,.2f}")
         except Exception as e:
-            print(f"   策略类或数据源集成创建失败: {e}")
+            print(f"   回测执行失败: {e}")
             import traceback
             traceback.print_exc()
         
