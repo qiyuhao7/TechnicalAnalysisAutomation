@@ -422,6 +422,122 @@ def plot_equity_curve(results, cerebro, df):
     plt.close(fig)
 
 
+def plot_max_drawdown_period(results, cerebro, df):
+    """
+    绘制最大回撤期间的详细图表
+    
+    Args:
+        results: 回测结果
+        cerebro: cerebro 引擎
+        df: 包含价格数据的 DataFrame
+    """
+    strategy = results[0]
+    
+    # 获取分析结果
+    drawdown_analysis = strategy.analyzers.drawdown.get_analysis()
+    
+    # 获取交易记录
+    buy_dates = strategy.buy_dates
+    buy_prices = strategy.buy_prices
+    sell_dates = strategy.sell_dates
+    sell_prices = strategy.sell_prices
+    
+    # 获取实际的价格数据
+    dates = df.index
+    close_prices = df['close'].values
+    
+    # 计算回撤
+    peak = np.maximum.accumulate(close_prices)
+    drawdown = (peak - close_prices) / peak * 100
+    
+    # 找到最大回撤的位置
+    max_dd_idx = np.argmax(drawdown)
+    max_dd = drawdown[max_dd_idx]
+    max_dd_date = dates[max_dd_idx]
+    max_dd_price = close_prices[max_dd_idx]
+    
+    # 确定最大回撤期间（从峰值到谷值）
+    # 找到峰值位置
+    peak_idx = np.argmax(close_prices[:max_dd_idx + 1])
+    
+    # 扩大显示范围（前后各20%的数据）
+    total_points = len(dates)
+    margin = int(total_points * 0.1)
+    start_idx = max(0, peak_idx - margin)
+    end_idx = min(total_points, max_dd_idx + margin)
+    
+    # 创建图表
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), gridspec_kw={'height_ratios': [3, 1]})
+    fig.suptitle(f'Maximum Drawdown Period Analysis\nMax Drawdown: {max_dd:.2f}%', 
+                fontsize=14, fontweight='bold')
+    
+    # 绘制价格曲线（聚焦于最大回撤期间）
+    period_dates = dates[start_idx:end_idx]
+    period_prices = close_prices[start_idx:end_idx]
+    
+    ax1.plot(period_dates, period_prices, color='blue', linewidth=2, label='Close Price')
+    
+    # 标注峰值和谷值
+    ax1.scatter(dates[peak_idx], close_prices[peak_idx], color='green', marker='^', s=200, zorder=5, label='Peak')
+    ax1.scatter(dates[max_dd_idx], close_prices[max_dd_idx], color='red', marker='v', s=200, zorder=5, label='Trough')
+    
+    # 添加标注
+    ax1.annotate(f'Peak\n{close_prices[peak_idx]:.2f}', 
+                xy=(dates[peak_idx], close_prices[peak_idx]),
+                xytext=(10, 20), textcoords='offset points',
+                fontsize=10, color='green', fontweight='bold',
+                arrowprops=dict(arrowstyle='->', color='green'))
+    
+    ax1.annotate(f'Trough\n{close_prices[max_dd_idx]:.2f}\nDrawdown: {max_dd:.2f}%', 
+                xy=(dates[max_dd_idx], close_prices[max_dd_idx]),
+                xytext=(10, -30), textcoords='offset points',
+                fontsize=10, color='red', fontweight='bold',
+                arrowprops=dict(arrowstyle='->', color='red'))
+    
+    # 标注期间的买卖点
+    for buy_date, buy_price in zip(buy_dates, buy_prices):
+        if start_idx <= np.searchsorted(dates, buy_date) < end_idx:
+            ax1.scatter(buy_date, buy_price, color='green', marker='^', s=100, zorder=5, alpha=0.7)
+    
+    for sell_date, sell_price in zip(sell_dates, sell_prices):
+        if start_idx <= np.searchsorted(dates, sell_date) < end_idx:
+            ax1.scatter(sell_date, sell_price, color='red', marker='v', s=100, zorder=5, alpha=0.7)
+    
+    ax1.set_ylabel('Price (USDT)')
+    ax1.set_title('Price Chart During Maximum Drawdown Period')
+    ax1.legend(loc='upper right')
+    ax1.grid(True, alpha=0.3)
+    
+    # 绘制回撤曲线（聚焦于最大回撤期间）
+    period_drawdown = drawdown[start_idx:end_idx]
+    ax2.fill_between(period_dates, period_drawdown, alpha=0.5, color='red')
+    ax2.scatter(dates[max_dd_idx], max_dd, color='darkred', marker='o', s=100, zorder=5)
+    ax2.annotate(f'Max Drawdown: {max_dd:.2f}%', 
+                xy=(dates[max_dd_idx], max_dd),
+                xytext=(10, 10), textcoords='offset points',
+                fontsize=10, color='darkred', fontweight='bold')
+    ax2.set_ylabel('Drawdown (%)')
+    ax2.set_xlabel('Date')
+    ax2.set_title('Drawdown Curve During Maximum Drawdown Period')
+    ax2.grid(True, alpha=0.3)
+    
+    # 旋转日期标签
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    
+    plt.tight_layout()
+    
+    # 保存图表
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    plot_file = os.path.join(script_dir, 'max_drawdown_period.png')
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    print(f"\nMax drawdown chart saved to: {plot_file}")
+    
+    # 关闭图表以释放内存
+    plt.close(fig)
+
+
 def main():
     """
     主函数
@@ -458,6 +574,10 @@ def main():
         # 5. 绘制图表
         print("5. 绘制图表...")
         plot_equity_curve(results, cerebro, df_with_signals)
+        
+        # 6. 绘制最大回撤期间图表
+        print("6. 绘制最大回撤期间图表...")
+        plot_max_drawdown_period(results, cerebro, df_with_signals)
         
         print("回测完成！")
         
