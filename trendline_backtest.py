@@ -313,8 +313,12 @@ def main():
         print("错误: 找不到数据文件 'BTCUSDT3600.csv'")
     except ValueError as e:
         print(f"数据错误: {e}")
+        import traceback
+        traceback.print_exc()
     except Exception as e:
         print(f"回测过程中发生错误: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
