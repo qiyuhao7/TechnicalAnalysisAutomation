@@ -157,6 +157,13 @@ class TrendlineBreakoutStrategy(bt.Strategy):
         self.long_signal = self.data.long_signal
         self.exit_signal = self.data.exit_signal
         
+        # 记录交易信息
+        self.trade_records = []
+        self.buy_prices = []
+        self.buy_dates = []
+        self.sell_prices = []
+        self.sell_dates = []
+        
     def next(self):
         # 如果没有持仓且出现做多信号，则买入
         if self.long_signal[0] == 1 and not self.position:
@@ -166,9 +173,18 @@ class TrendlineBreakoutStrategy(bt.Strategy):
             size = cash / price
             self.buy(size=size)
             
+            # 记录买入信息
+            self.buy_prices.append(price)
+            self.buy_dates.append(self.data.datetime.date(0))
+            
         # 如果有持仓且出现平仓信号，则卖出
         elif self.exit_signal[0] == 1 and self.position:
+            price = self.data.close[0]
             self.sell(size=self.position.size)
+            
+            # 记录卖出信息
+            self.sell_prices.append(price)
+            self.sell_dates.append(self.data.datetime.date(0))
 
 
 def run_backtest(df, initial_cash=10000):
@@ -315,13 +331,14 @@ def print_results(results, cerebro):
     print("="*50)
 
 
-def plot_equity_curve(results, cerebro):
+def plot_equity_curve(results, cerebro, df):
     """
-    绘制权益曲线和回撤图
+    绘制权益曲线和回撤图，并标注买卖点
     
     Args:
         results: 回测结果
         cerebro: cerebro 引擎
+        df: 包含价格数据的 DataFrame
     """
     strategy = results[0]
     
@@ -329,64 +346,68 @@ def plot_equity_curve(results, cerebro):
     returns_analysis = strategy.analyzers.returns.get_analysis()
     drawdown_analysis = strategy.analyzers.drawdown.get_analysis()
     
-    # 获取权益曲线数据
-    # 使用 broker 的值变化来构建权益曲线
-    # 注意：backtrader 没有直接提供权益曲线，我们需要通过其他方式获取
+    # 获取交易记录
+    buy_dates = strategy.buy_dates
+    buy_prices = strategy.buy_prices
+    sell_dates = strategy.sell_dates
+    sell_prices = strategy.sell_prices
+    
+    # 获取实际的价格数据
+    dates = df.index
+    close_prices = df['close'].values
     
     # 创建图表
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]})
-    fig.suptitle('趋势线突破策略回测结果', fontsize=14)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), gridspec_kw={'height_ratios': [3, 1]})
+    fig.suptitle('Trendline Breakout Strategy Backtest Results', fontsize=14, fontweight='bold')
     
-    # 绘制资金曲线
-    # 由于 backtrader 没有直接提供权益曲线，我们使用简化的展示方式
-    initial_cash = cerebro.broker.startingcash
-    final_value = cerebro.broker.getvalue()
+    # 绘制价格曲线
+    ax1.plot(dates, close_prices, color='blue', linewidth=1, alpha=0.7, label='Close Price')
     
-    # 创建简化的权益曲线（实际应用中需要从策略中获取完整的权益历史）
-    # 这里我们使用一个示意性的曲线
-    periods = 100
-    equity_curve = np.linspace(initial_cash, final_value, periods)
+    # 标注买点
+    for i, (buy_date, buy_price) in enumerate(zip(buy_dates, buy_prices)):
+        ax1.scatter(buy_date, buy_price, color='green', marker='^', s=100, zorder=5)
+        if i == 0:
+            ax1.annotate('Buy', xy=(buy_date, buy_price), xytext=(10, 10),
+                        textcoords='offset points', fontsize=8, color='green',
+                        arrowprops=dict(arrowstyle='->', color='green'))
     
-    # 添加一些波动来模拟真实的权益曲线
-    np.random.seed(42)
-    noise = np.random.normal(0, 1000, periods).cumsum()
-    equity_curve = equity_curve + noise
+    # 标注卖点
+    for i, (sell_date, sell_price) in enumerate(zip(sell_dates, sell_prices)):
+        ax1.scatter(sell_date, sell_price, color='red', marker='v', s=100, zorder=5)
+        if i == 0:
+            ax1.annotate('Sell', xy=(sell_date, sell_price), xytext=(10, -15),
+                        textcoords='offset points', fontsize=8, color='red',
+                        arrowprops=dict(arrowstyle='->', color='red'))
     
-    # 确保最终值正确
-    equity_curve[-1] = final_value
-    
-    # 绘制权益曲线
-    ax1.plot(equity_curve, color='blue', linewidth=2, label='权益曲线')
-    ax1.axhline(y=initial_cash, color='gray', linestyle='--', alpha=0.5, label='初始资金')
-    ax1.axhline(y=final_value, color='green', linestyle='--', alpha=0.5, label='最终资金')
-    ax1.fill_between(range(periods), equity_curve, initial_cash, 
-                     where=(equity_curve >= initial_cash), alpha=0.3, color='green')
-    ax1.fill_between(range(periods), equity_curve, initial_cash, 
-                     where=(equity_curve < initial_cash), alpha=0.3, color='red')
-    ax1.set_ylabel('资金 (USDT)')
-    ax1.set_title('资金曲线')
-    ax1.legend()
+    ax1.set_ylabel('Price (USDT)')
+    ax1.set_title('Price Chart with Trade Signals')
+    ax1.legend(loc='upper left')
     ax1.grid(True, alpha=0.3)
     
-    # 绘制回撤曲线
-    # 计算回撤
-    peak = np.maximum.accumulate(equity_curve)
-    drawdown = (peak - equity_curve) / peak * 100
+    # 计算并绘制回撤曲线
+    # 使用价格数据计算回撤
+    peak = np.maximum.accumulate(close_prices)
+    drawdown = (peak - close_prices) / peak * 100
     
-    ax2.fill_between(range(periods), drawdown, alpha=0.5, color='red')
-    ax2.set_ylabel('回撤 (%)')
-    ax2.set_xlabel('周期')
-    ax2.set_title('回撤曲线')
+    ax2.fill_between(dates, drawdown, alpha=0.5, color='red')
+    ax2.set_ylabel('Drawdown (%)')
+    ax2.set_xlabel('Date')
+    ax2.set_title('Drawdown Curve')
     ax2.grid(True, alpha=0.3)
     
     # 添加统计信息
     max_dd = drawdown_analysis.get('max', {}).get('drawdown', 0)
     total_return = returns_analysis.get('rtot', 0) * 100
+    total_trades = len(buy_dates)
     
-    textstr = f'总收益率: {total_return:.2f}%\n最大回撤: {max_dd:.2f}%'
+    textstr = f'Total Return: {total_return:.2f}%\nMax Drawdown: {max_dd:.2f}%\nTotal Trades: {total_trades}'
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', bbox=props)
+    
+    # 旋转日期标签
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
     
     plt.tight_layout()
     
@@ -395,7 +416,7 @@ def plot_equity_curve(results, cerebro):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     plot_file = os.path.join(script_dir, 'backtest_results.png')
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-    print(f"\n图表已保存到: {plot_file}")
+    print(f"\nChart saved to: {plot_file}")
     
     # 关闭图表以释放内存
     plt.close(fig)
@@ -436,7 +457,7 @@ def main():
         
         # 5. 绘制图表
         print("5. 绘制图表...")
-        plot_equity_curve(results, cerebro)
+        plot_equity_curve(results, cerebro, df_with_signals)
         
         print("回测完成！")
         
