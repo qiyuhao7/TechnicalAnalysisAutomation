@@ -140,13 +140,22 @@ class TrendlineBreakoutStrategy(bt.Strategy):
     趋势线突破策略
     
     做多条件：价格向上突破下降趋势线（阻力线）
-    平仓条件：价格跌破上升趋势线（支撑线）
+    平仓条件：价格跌破上升趋势线（支撑线）或触发 ATR 止损
     """
+    
+    # 策略参数
+    params = (
+        ('atr_period', 14),  # ATR 周期
+        ('atr_multiplier', 2.0),  # ATR 乘数，用于计算止损距离
+    )
     
     def __init__(self):
         # 获取信号数据
         self.long_signal = self.data.long_signal
         self.exit_signal = self.data.exit_signal
+        
+        # 计算 ATR
+        self.atr = bt.indicators.ATR(self.data, period=self.params.atr_period)
         
         # 记录交易信息
         self.trade_records = []
@@ -154,6 +163,10 @@ class TrendlineBreakoutStrategy(bt.Strategy):
         self.buy_dates = []
         self.sell_prices = []
         self.sell_dates = []
+        
+        # 止损相关变量
+        self.stop_loss_price = None
+        self.entry_atr = None
         
     def next(self):
         # 如果没有持仓且出现做多信号，则买入
@@ -168,23 +181,47 @@ class TrendlineBreakoutStrategy(bt.Strategy):
             self.buy_prices.append(price)
             self.buy_dates.append(self.data.datetime.date(0))
             
-        # 如果有持仓且出现平仓信号，则卖出
-        elif self.exit_signal[0] == 1 and self.position:
-            price = self.data.close[0]
-            self.sell(size=self.position.size)
+            # 设置 ATR 止损
+            self.entry_atr = self.atr[0]
+            self.stop_loss_price = price - (self.params.atr_multiplier * self.entry_atr)
             
-            # 记录卖出信息
-            self.sell_prices.append(price)
-            self.sell_dates.append(self.data.datetime.date(0))
+        # 如果有持仓，检查是否需要卖出
+        elif self.position:
+            # 检查是否触发 ATR 止损
+            if self.stop_loss_price is not None and self.data.close[0] < self.stop_loss_price:
+                price = self.data.close[0]
+                self.sell(size=self.position.size)
+                
+                # 记录卖出信息
+                self.sell_prices.append(price)
+                self.sell_dates.append(self.data.datetime.date(0))
+                
+                # 重置止损变量
+                self.stop_loss_price = None
+                self.entry_atr = None
+                
+            # 检查是否出现趋势线平仓信号
+            elif self.exit_signal[0] == 1:
+                price = self.data.close[0]
+                self.sell(size=self.position.size)
+                
+                # 记录卖出信息
+                self.sell_prices.append(price)
+                self.sell_dates.append(self.data.datetime.date(0))
+                
+                # 重置止损变量
+                self.stop_loss_price = None
+                self.entry_atr = None
 
 
-def run_backtest(df, initial_cash=10000):
+def run_backtest(df, initial_cash=10000, atr_multiplier=2.0):
     """
     执行回测
     
     Args:
         df: 包含交易信号的 DataFrame
         initial_cash: 初始资金
+        atr_multiplier: ATR 乘数，用于计算止损距离
         
     Returns:
         回测结果
@@ -199,7 +236,7 @@ def run_backtest(df, initial_cash=10000):
     cerebro = bt.Cerebro()
     
     # 添加策略
-    cerebro.addstrategy(TrendlineBreakoutStrategy)
+    cerebro.addstrategy(TrendlineBreakoutStrategy, atr_multiplier=atr_multiplier)
     
     # 准备数据
     # 添加额外列供 backtrader 使用
