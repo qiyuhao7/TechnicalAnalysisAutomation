@@ -286,9 +286,14 @@ def main():
     try:
         print("开始趋势线突破回测...")
         
+        # 获取脚本所在目录
+        import os
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        data_file = os.path.join(script_dir, "BTCUSDT3600.csv")
+        
         # 1. 数据预处理
         print("1. 数据预处理...")
-        df = preprocess_data("BTCUSDT3600.csv")
+        df = preprocess_data(data_file)
         print(f"   数据形状: {df.shape}")
         
         # 2. 信号生成
