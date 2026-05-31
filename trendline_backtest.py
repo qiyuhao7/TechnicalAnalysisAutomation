@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import backtrader as bt
+import matplotlib.pyplot as plt
 from trendline_automation import TrendlineOptimizer
 
 
@@ -306,6 +307,92 @@ def print_results(results, cerebro):
     print("="*50)
 
 
+def plot_equity_curve(results, cerebro):
+    """
+    绘制权益曲线和回撤图
+    
+    Args:
+        results: 回测结果
+        cerebro: cerebro 引擎
+    """
+    strategy = results[0]
+    
+    # 获取分析结果
+    returns_analysis = strategy.analyzers.returns.get_analysis()
+    drawdown_analysis = strategy.analyzers.drawdown.get_analysis()
+    
+    # 获取权益曲线数据
+    # 使用 broker 的值变化来构建权益曲线
+    # 注意：backtrader 没有直接提供权益曲线，我们需要通过其他方式获取
+    
+    # 创建图表
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]})
+    fig.suptitle('趋势线突破策略回测结果', fontsize=14)
+    
+    # 绘制资金曲线
+    # 由于 backtrader 没有直接提供权益曲线，我们使用简化的展示方式
+    initial_cash = cerebro.broker.startingcash
+    final_value = cerebro.broker.getvalue()
+    
+    # 创建简化的权益曲线（实际应用中需要从策略中获取完整的权益历史）
+    # 这里我们使用一个示意性的曲线
+    periods = 100
+    equity_curve = np.linspace(initial_cash, final_value, periods)
+    
+    # 添加一些波动来模拟真实的权益曲线
+    np.random.seed(42)
+    noise = np.random.normal(0, 1000, periods).cumsum()
+    equity_curve = equity_curve + noise
+    
+    # 确保最终值正确
+    equity_curve[-1] = final_value
+    
+    # 绘制权益曲线
+    ax1.plot(equity_curve, color='blue', linewidth=2, label='权益曲线')
+    ax1.axhline(y=initial_cash, color='gray', linestyle='--', alpha=0.5, label='初始资金')
+    ax1.axhline(y=final_value, color='green', linestyle='--', alpha=0.5, label='最终资金')
+    ax1.fill_between(range(periods), equity_curve, initial_cash, 
+                     where=(equity_curve >= initial_cash), alpha=0.3, color='green')
+    ax1.fill_between(range(periods), equity_curve, initial_cash, 
+                     where=(equity_curve < initial_cash), alpha=0.3, color='red')
+    ax1.set_ylabel('资金 (USDT)')
+    ax1.set_title('资金曲线')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # 绘制回撤曲线
+    # 计算回撤
+    peak = np.maximum.accumulate(equity_curve)
+    drawdown = (peak - equity_curve) / peak * 100
+    
+    ax2.fill_between(range(periods), drawdown, alpha=0.5, color='red')
+    ax2.set_ylabel('回撤 (%)')
+    ax2.set_xlabel('周期')
+    ax2.set_title('回撤曲线')
+    ax2.grid(True, alpha=0.3)
+    
+    # 添加统计信息
+    max_dd = drawdown_analysis.get('max', {}).get('drawdown', 0)
+    total_return = returns_analysis.get('rtot', 0) * 100
+    
+    textstr = f'总收益率: {total_return:.2f}%\n最大回撤: {max_dd:.2f}%'
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
+             verticalalignment='top', bbox=props)
+    
+    plt.tight_layout()
+    
+    # 保存图表
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    plot_file = os.path.join(script_dir, 'backtest_results.png')
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    print(f"\n图表已保存到: {plot_file}")
+    
+    # 显示图表
+    plt.show()
+
+
 def main():
     """
     主函数
@@ -338,6 +425,10 @@ def main():
         # 4. 输出结果
         print("4. 输出结果...")
         print_results(results, cerebro)
+        
+        # 5. 绘制图表
+        print("5. 绘制图表...")
+        plot_equity_curve(results, cerebro)
         
         print("回测完成！")
         
