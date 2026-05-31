@@ -124,6 +124,17 @@ def generate_signals(df, atr_period=14, atr_multiplier=0.5):
     return df
 
 
+class SignalData(bt.feeds.PandasData):
+    """
+    自定义 backtrader 数据类，支持信号列
+    """
+    lines = ('long_signal', 'exit_signal',)
+    params = (
+        ('long_signal', -1),
+        ('exit_signal', -1),
+    )
+
+
 class TrendlineBreakoutStrategy(bt.Strategy):
     """
     趋势线突破策略
@@ -177,15 +188,33 @@ if __name__ == "__main__":
         
         print("所有测试通过！")
         
-        # 测试策略类
-        print("\n3. 测试策略类...")
+        # 测试策略类和数据源集成
+        print("\n3. 测试策略类和数据源集成...")
         try:
+            # 准备数据
+            df_bt = df_with_signals[['open', 'high', 'low', 'close', 'long_signal', 'exit_signal']].copy()
+            
+            # 创建自定义数据源
+            data = SignalData(
+                dataname=df_bt,
+                datetime=None,
+                open='open',
+                high='high',
+                low='low',
+                close='close',
+                volume=None,
+                openinterest=-1
+            )
+            
             # 使用 backtrader 的正确方式测试策略类
             cerebro = bt.Cerebro()
+            cerebro.adddata(data)
             cerebro.addstrategy(TrendlineBreakoutStrategy)
-            print("   策略类创建成功")
+            print("   策略类和数据源集成创建成功")
         except Exception as e:
-            print(f"   策略类创建失败: {e}")
+            print(f"   策略类或数据源集成创建失败: {e}")
+            import traceback
+            traceback.print_exc()
         
     except Exception as e:
         print(f"测试失败: {e}")
