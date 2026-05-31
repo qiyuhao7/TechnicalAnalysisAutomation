@@ -279,54 +279,43 @@ def print_results(results, cerebro):
     print("="*50)
 
 
-if __name__ == "__main__":
+def main():
+    """
+    主函数
+    """
     try:
-        print("开始测试信号生成函数...")
+        print("开始趋势线突破回测...")
         
-        # 测试数据预处理
-        print("1. 测试数据预处理...")
+        # 1. 数据预处理
+        print("1. 数据预处理...")
         df = preprocess_data("BTCUSDT3600.csv")
         print(f"   数据形状: {df.shape}")
         
-        # 测试信号生成
-        print("2. 测试信号生成...")
+        # 2. 信号生成
+        print("2. 信号生成...")
         df_with_signals = generate_signals(df)
-        
         long_signals = df_with_signals['long_signal'].sum()
         exit_signals = df_with_signals['exit_signal'].sum()
-        
-        print(f"   信号生成成功")
         print(f"   做多信号数量: {long_signals}")
         print(f"   平仓信号数量: {exit_signals}")
         
-        # 验证信号列存在
-        assert 'long_signal' in df_with_signals.columns, "缺少 long_signal 列"
-        assert 'exit_signal' in df_with_signals.columns, "缺少 exit_signal 列"
+        # 3. 执行回测
+        print("3. 执行回测...")
+        results, cerebro = run_backtest(df_with_signals)
         
-        print("所有测试通过！")
+        # 4. 输出结果
+        print("4. 输出结果...")
+        print_results(results, cerebro)
         
-        # 测试回测执行函数
-        print("\n3. 测试回测执行函数...")
-        try:
-            results, cerebro = run_backtest(df_with_signals)
-            print("   回测执行成功")
-            print(f"   最终资金: {cerebro.broker.getvalue():,.2f}")
-        except Exception as e:
-            print(f"   回测执行失败: {e}")
-            import traceback
-            traceback.print_exc()
+        print("回测完成！")
         
-        # 测试结果输出函数
-        print("\n4. 测试结果输出函数...")
-        try:
-            print_results(results, cerebro)
-            print("结果输出成功")
-        except Exception as e:
-            print(f"结果输出失败: {e}")
-            import traceback
-            traceback.print_exc()
-        
+    except FileNotFoundError:
+        print("错误: 找不到数据文件 'BTCUSDT3600.csv'")
+    except ValueError as e:
+        print(f"数据错误: {e}")
     except Exception as e:
-        print(f"测试失败: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"回测过程中发生错误: {e}")
+
+
+if __name__ == "__main__":
+    main()
