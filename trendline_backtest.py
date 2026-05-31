@@ -256,6 +256,12 @@ def print_results(results, cerebro):
     max_drawdown = drawdown_analysis.get('max', {}).get('drawdown', 0)
     print(f"最大回撤: {max_drawdown:.2f}%")
     
+    # 回撤详情
+    max_drawdown_len = drawdown_analysis.get('max', {}).get('len', 0)
+    max_drawdown_money = drawdown_analysis.get('max', {}).get('moneydown', 0)
+    print(f"最大回撤持续时间: {max_drawdown_len} 个周期")
+    print(f"最大回撤金额: {max_drawdown_money:,.2f}")
+    
     # 夏普比率
     sharpe_ratio = sharpe_analysis.get('sharperatio', 0)
     if sharpe_ratio is not None:
@@ -275,6 +281,27 @@ def print_results(results, cerebro):
     if total_trades > 0:
         win_rate = won_trades / total_trades * 100
         print(f"胜率: {win_rate:.2f}%")
+        
+        # 计算平均盈利和平均亏损
+        won_total = trades_analysis.get('won', {}).get('pnl', {}).get('total', 0)
+        lost_total = trades_analysis.get('lost', {}).get('pnl', {}).get('total', 0)
+        
+        if won_trades > 0:
+            avg_won = won_total / won_trades
+            print(f"平均盈利: {avg_won:,.2f}")
+        
+        if lost_trades > 0:
+            avg_lost = lost_total / lost_trades
+            print(f"平均亏损: {avg_lost:,.2f}")
+        
+        # 盈利因子
+        if lost_total != 0:
+            profit_factor = abs(won_total / lost_total)
+            print(f"盈利因子: {profit_factor:.2f}")
+        
+        # 最大连续亏损
+        max_consecutive_loss = trades_analysis.get('lost', {}).get('streak', {}).get('max', 0)
+        print(f"最大连续亏损次数: {max_consecutive_loss}")
     
     print("="*50)
 
