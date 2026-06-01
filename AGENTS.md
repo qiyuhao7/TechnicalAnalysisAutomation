@@ -8,6 +8,10 @@
 
 技术形态自动化识别模块，包含趋势线、头肩顶、旗形等技术形态识别算法。使用 backtrader 进行回测。
 
+## 知识库
+
+Obsidian 知识库位置：`C:\Users\qiyuh\Documents\jianguoyun\Notes\政经\量化\TechnicalAnalysisAutomation`
+
 ## 运行环境
 
 使用上一层级的 uv 环境运行 Python 脚本：
@@ -46,21 +50,3 @@ uv run python TechnicalAnalysisAutomation/test_flag_patterns.py
 - `BTCUSDT3600.csv`：BTC/USDT 1小时K线数据
 - `docs/strategy_optimization_notes.md`：策略优化笔记和回测结果
 - `docs/superpowers/`：设计文档和实现计划
-
-## 策略说明
-
-### 趋势线突破策略
-- **做多条件**：价格向上突破下降趋势线（阻力线）
-- **平仓条件**：价格跌破上升趋势线（支撑线）或触发 ATR 止损
-- **突破阈值**：ATR(14) × 0.5
-
-### ATR 止损策略
-- **固定止损**：止损价 = 买入价 - (k × ATR)
-- **移动止损**：止损价 = 最高价 - (k × ATR)
-- **推荐参数**：ATR 乘数 = 1.0
-
-### 回测结果（ATR 固定止损 1.0）
-- 总收益率：108.86%
-- 最大回撤：30.10%
-- 夏普比率：2.4035
-- 盈利因子：1.34
